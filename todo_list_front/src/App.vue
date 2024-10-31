@@ -1,6 +1,13 @@
 <script setup>
-import { RouterLink } from 'vue-router';
-import Calendar from './components/Calendar.vue';
+import { ref } from 'vue';
+import { RouterLink, RouterView, useRouter } from 'vue-router';
+
+const router = useRouter();
+
+const logout = () => {
+  localStorage.removeItem('token'); // Supprime le token du stockage local
+  router.push('/login'); // Redirige vers la page de connexion
+};
 </script>
 
 <template>
@@ -10,29 +17,25 @@ import Calendar from './components/Calendar.vue';
         <RouterLink to="/">Calendar App</RouterLink>
       </div>
       <nav class="app-navigation">
-        <RouterLink to="/" class="hover:text-gray-300">Calendar</RouterLink>
+        <button @click="logout" class="text-gray-100 hover:text-gray-300">
+          Log out
+        </button>
       </nav>
     </header>
 
     <main class="app-content p-6">
-     
-      <Calendar />
+      <RouterView></RouterView>
     </main>
   </div>
 </template>
+
 <style scoped>
 .app-container {
   @apply bg-gray-100 min-h-screen;
-  /* Enlever les marges par défaut */
-  /* Hauteur à 100% de la fenêtre */
   background-image: url('./assets/boss-s-day-assortment-blue-background-with-empty-notepad.jpg');
-  /* Remplacez par le chemin de votre image */
   background-size: cover;
-  /* Couvre toute la page */
   background-position: center;
-  /* Centre l'image */
   background-repeat: no-repeat;
-  /* Ne pas répéter l'image */
 }
 
 .app-header {

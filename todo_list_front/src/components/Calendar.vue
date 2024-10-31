@@ -1,5 +1,5 @@
 <template>
-    <div class="bg-gray-200 overflow-x-auto mt-20 pb-20" style="background-color: rgba(229, 231, 235, 0.0);">
+    <div class="bg-gray-200  mt-20 pb-20 overflow-hidden" style="background-color: rgba(229, 231, 235, 0.0);">
         <div class="container mx-auto py-12 mt-10">
             <h1 class="text-3xl font-bold mb-6 text-center">Calendar App</h1>
 
@@ -10,6 +10,12 @@
                     role="alert">
                     <span class="icon mr-2">&#10003;</span>
                     {{ notification }}
+                </div>
+
+                <!-- Barre de recherche -->
+                <div class="flex justify-center mb-4">
+                    <input v-model="searchTerm" type="text" placeholder="Search events by title..."
+                        class="border-gray-300 rounded-lg py-2 px-4 w-full max-w-md focus:outline-none focus:ring focus:border-blue-500" />
                 </div>
 
                 <!-- Modal for adding/editing event -->
@@ -35,9 +41,9 @@
                     </div>
                 </div>
 
-                <div class="flex justify-between items-center mb-4">
-                    <table class="w-full">
-                        <thead>
+                <div class="flex justify-between items-center mb-4 max-h-[50vh] overflow-auto ">
+                    <table class="w-full h-full   ">
+                        <thead class="   bg-gray-100">
                             <tr>
                                 <th v-for="(day, index) in weekdays" :key="day"
                                     :class="{ 'text-red-500': selectedDay === index, 'cursor-pointer': true }"
@@ -54,11 +60,19 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td v-for="(events, dayIndex) in calendar" :key="dayIndex">
-                                    <div v-for="event in events" :key="event._id"
-                                        class= "bg-gray-200 rounded-lg p-4 text-center font-bold mb-2 flex justify-center  fade-in ">
-                                        <span class="mr-3">{{ event.title }}</span>
-                                        <div class="flex items-center ">
+                                <td class="break-words" v-for="(events, dayIndex) in calendar" :key="dayIndex">
+                                    <div v-for="event in filteredEvents(dayIndex)" :key="event._id"
+                                        class="bg-gray-200 rounded-lg p-4 text-center font-bold mb-2 flex justify-between fade-in h-12 overflow-hidden relative">
+
+                                        <!-- Titre tronqué avec infobulle -->
+                                        <span class="mr-3 truncate max-w-[100px] relative group">
+                                            {{ event.title }}
+
+
+                                        </span>
+
+                                        <!-- Boutons d'édition et de suppression -->
+                                        <div class=" ">
                                             <button @click="editEvent(event)"
                                                 class="text-blue-500 hover:text-blue-700 mr-4">
                                                 &#9998;
@@ -67,15 +81,38 @@
                                                 class="text-red-500 hover:text-red-700">
                                                 &#10006;
                                             </button>
+                                            <button @click="showEventModalContent(event)"
+                                                class="text-green-500 hover:text-green-700 ml-4">
+                                                &#128065;
+                                            </button>
                                         </div>
                                     </div>
                                 </td>
+
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
+
+        <!-- Modal for Event Details -->
+        <div v-if="showEventModal"
+            class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 max-w-full">
+            <div class="bg-white rounded-lg p-8 modal fade-in max-w-md w-full">
+                <h2 class="text-xl font-bold mb-4 break-words">Event Details</h2>
+                <p class="break-words">{{ selectedEvent.title }}</p>
+                <p class="break-words">Date: {{ selectedEvent.date }}</p>
+                <div class="flex justify-end mt-4">
+                    <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded"
+                        @click="showEventModal = false">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
 
         <!-- Modal de Confirmation -->
         <div v-if="showDeleteModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -111,35 +148,105 @@ export default {
             notification: '',
             isEditing: false,
             currentEventId: null,
-            showDeleteModal: false // Variable pour contrôler l'affichage du modal de suppression
+            showDeleteModal: false, // Variable pour contrôler l'affichage du modal de suppression
+            showEventModal: false, // Pour contrôler l'affichage du modal d'événement
+            selectedEvent: {}, // Pour stocker l'événement sélectionné
+            searchTerm: ''
         };
     },
     mounted() {
+        const token = localStorage.getItem('token');
         this.fetchEvents();
+    },
+    computed: {
+        filteredEvents() {
+            return (dayIndex) => {
+                if (!this.searchTerm) return this.calendar[dayIndex]; // Affiche tous les événements si aucun terme de recherche n'est entré
+                return this.calendar[dayIndex].filter(event =>
+                    event.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+                );
+            };
+        }
     },
     methods: {
         fetchEvents() {
-            axios.get('http://localhost:5000/api/events')
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                this.notification = 'Veuillez vous connecter pour accéder aux événements.';
+                this.$router.push('/login');
+                return;
+            }
+
+            axios.get('http://localhost:5000/api/events', {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
                 .then(response => {
-                    this.populateCalendar(response.data);
+                    console.log('Fetched events:', response.data); // Vérifiez les événements récupérés
+                    this.populateCalendar(response.data); // Appel avec les événements récupérés
                 })
                 .catch(error => {
-                    console.error('Error fetching events:', error);
+                    console.error('Error fetching events:', error.response ? error.response.data : error);
+                    this.notification = 'Erreur lors de la récupération des événements.';
                 });
-        },
-        populateCalendar(events) {
-            this.calendar = Array(7).fill([]).map(() => []);
+        }, populateCalendar(events) {
+            this.calendar = Array(7).fill(null).map(() => []);
+
             if (Array.isArray(events)) {
                 events.forEach(event => {
-                    const date = new Date(event.date);
-                    const dayIndex = date.getDay() - 1;
-                    if (dayIndex >= 0) {
+                    console.log('Event date:', event.date); // Vérifiez la date de l'événement
+
+                    // Vérifiez si event.date est une chaîne et essayez de la convertir
+                    let date;
+                    if (typeof event.date === 'string') {
+                        // Convertir la chaîne "Friday" ou d'autres noms de jour en une date
+                        const dayMapping = {
+                            'Sunday': 0,
+                            'Monday': 1,
+                            'Tuesday': 2,
+                            'Wednesday': 3,
+                            'Thursday': 4,
+                            'Friday': 5,
+                            'Saturday': 6
+                        };
+
+                        // Si c'est un jour de la semaine, créez une date pour le jour donné
+                        if (dayMapping[event.date] !== undefined) {
+                            const today = new Date();
+                            date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (dayMapping[event.date] - today.getDay()));
+                        } else {
+                            // Si ce n'est pas un jour valide, essayez de le convertir en format ISO
+                            date = new Date(event.date); // Tentez de créer une date à partir de la chaîne
+                        }
+                    } else {
+                        date = new Date(event.date);
+                    }
+
+                    // Vérifiez si la date est valide
+                    if (isNaN(date.getTime())) {
+                        console.error('Invalid date:', event.date);
+                        return; // Ignorez cet événement
+                    }
+
+                    const dayIndex = (date.getDay() + 6) % 7; // Ajustement pour le calendrier
+                    console.log('Calculated dayIndex:', dayIndex);
+
+                    if (dayIndex >= 0 && dayIndex < 7) {
+                        console.log('Adding event to dayIndex:', dayIndex, event);
                         this.calendar[dayIndex].push(event);
+                    } else {
+                        console.error('Invalid dayIndex:', dayIndex);
                     }
                 });
             } else {
                 console.error('Expected events to be an array, but got:', events);
             }
+        },
+        showEventModalContent(event) {
+            this.selectedEvent = event; // Stocker l'événement sélectionné
+            this.showEventModal = true; // Afficher le modal
         },
         selectDay(dayIndex) {
             this.selectedDay = dayIndex;
@@ -153,6 +260,8 @@ export default {
             this.isEditing = false;
             this.currentEventId = null;
         },
+
+
         addEvent() {
             if (this.newEventTitle.trim() === '') {
                 this.notification = 'Veuillez entrer un titre pour l\'événement.';
@@ -171,14 +280,20 @@ export default {
             }
 
             const eventDate = this.weekdays[this.selectedDay];
+            const token = localStorage.getItem('token'); // Récupérer le token
+
+
             if (this.isEditing) {
-                axios.put(`http://localhost:5000/api/events/${this.currentEventId}`, { title: this.newEventTitle.trim(), date: eventDate })
+                axios.put(`http://localhost:5000/api/events/${this.currentEventId}`,
+                    { title: this.newEventTitle.trim(), date: eventDate },
+                    { headers: { Authorization: `Bearer ${token}` } } // Ajouter le token ici
+                )
                     .then(response => {
                         const index = this.calendar[this.selectedDay].findIndex(event => event._id === this.currentEventId);
                         if (index !== -1) {
                             this.calendar[this.selectedDay][index] = response.data;
                         }
-                        this.notification = 'Event updated successfully!';
+                        this.notification = 'Événement mis à jour avec succès!';
                         this.showForm = false;
                         this.resetForm();
                         setTimeout(() => {
@@ -189,10 +304,13 @@ export default {
                         console.error('Error updating event:', error);
                     });
             } else {
-                axios.post('http://localhost:5000/api/events', { title: this.newEventTitle.trim(), date: eventDate })
+                axios.post('http://localhost:5000/api/events',
+                    { title: this.newEventTitle.trim(), date: eventDate },
+                    { headers: { Authorization: `Bearer ${token}` } } // Ajouter le token ici
+                )
                     .then(response => {
-                        this.calendar[this.selectedDay].push(response.data);
-                        this.notification = 'Event added successfully!';
+                        this.calendar[this.selectedDay].unshift(response.data);
+                        this.notification = 'Événement ajouté avec succès!';
                         this.showForm = false;
                         this.resetForm();
                         setTimeout(() => {
@@ -204,6 +322,8 @@ export default {
                     });
             }
         },
+
+
         editEvent(event) {
             this.newEventTitle = event.title;
             this.selectedDay = this.weekdays.indexOf(event.date);
@@ -216,7 +336,13 @@ export default {
             this.showDeleteModal = true; // Ouvre le modal de confirmation
         },
         deleteEvent(eventId) {
-            axios.delete(`http://localhost:5000/api/events/${eventId}`)
+            const token = localStorage.getItem('token'); // Récupérer le token
+
+            axios.delete(`http://localhost:5000/api/events/${eventId}`, {
+                headers: {
+                    Authorization: `Bearer ${token}` // Ajouter le token ici
+                }
+            })
                 .then(() => {
                     this.calendar.forEach(dayEvents => {
                         const index = dayEvents.findIndex(event => event._id === eventId);
@@ -224,7 +350,7 @@ export default {
                             dayEvents.splice(index, 1);
                         }
                     });
-                    this.notification = 'Event deleted successfully!';
+                    this.notification = 'Événement supprimé avec succès!';
                     this.showDeleteModal = false; // Ferme le modal après la suppression
                     setTimeout(() => {
                         this.notification = '';
@@ -239,6 +365,18 @@ export default {
 </script>
 
 <style>
+td {
+    max-width: 150px;
+    word-break: break-word;
+}
+
+html,
+body {
+    overflow-y: hidden;
+    /* Empêche le scroll vertical */
+}
+
+
 .notification {
     display: flex;
     align-items: center;
