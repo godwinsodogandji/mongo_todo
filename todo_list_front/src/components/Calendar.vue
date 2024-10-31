@@ -184,7 +184,6 @@ export default {
                 }
             })
                 .then(response => {
-                    console.log('Fetched events:', response.data); // Vérifiez les événements récupérés
                     this.populateCalendar(response.data); // Appel avec les événements récupérés
                 })
                 .catch(error => {
@@ -196,7 +195,6 @@ export default {
 
             if (Array.isArray(events)) {
                 events.forEach(event => {
-                    console.log('Event date:', event.date); // Vérifiez la date de l'événement
 
                     // Vérifiez si event.date est une chaîne et essayez de la convertir
                     let date;
@@ -226,15 +224,12 @@ export default {
 
                     // Vérifiez si la date est valide
                     if (isNaN(date.getTime())) {
-                        console.error('Invalid date:', event.date);
                         return; // Ignorez cet événement
                     }
 
                     const dayIndex = (date.getDay() + 6) % 7; // Ajustement pour le calendrier
-                    console.log('Calculated dayIndex:', dayIndex);
 
                     if (dayIndex >= 0 && dayIndex < 7) {
-                        console.log('Adding event to dayIndex:', dayIndex, event);
                         this.calendar[dayIndex].push(event);
                     } else {
                         console.error('Invalid dayIndex:', dayIndex);
